@@ -4,6 +4,65 @@ require_once '../Model/Response.php';
 try {
     $writeDB = DB::connectWriteDB();
     if (array_key_exists('sessionid', $_GET)) {
+        $sessionId = $_GET['sessionid'];
+        if (!is_numeric($sessionId) || $sessionId === '') {
+            $response = new Response();
+            $response->setSuccess(false);
+            $response->setHttpStatusCode(400);
+            !is_numeric($sessionID) ? $response->addMessage("Session ID must be numeric") : null;
+            $sessionID === '' ? $response->addMessage("Session ID cannot be blank") : null;
+            $response->send();
+            exit;
+        }
+        if (!isset($_SERVER['HTTP_AUTHORIZATION']) || strlen($_SERVER['HTTP_AUTHORIZATION']) < 1) {
+            $response = new Response();
+            $response->setSuccess(false);
+            $response->setHttpStatusCode(401);
+            !isset($_SERVER['HTTP_AUTHORIZATION']) ? $response->addMessage("Authorization header not found") : null;
+            strlen($_SERVER['HTTP_AUTHORIZATION']) < 1 ? $response->addMessage("Authorization header cannot be blank") : null;
+            $response->send();
+            exit;
+        }
+        $authorizationHeader = $_SERVER['HTTP_AUTHORIZATION'];
+        if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+            try {
+                $query = $writeDB->prepare('DELETE FROM tbl_sessions WHERE id = :sessionid and accessToken = :accesstoken');
+                $query->bindParam(':sessionid', $sessionId, PDO::PARAM_INT);
+                $query->bindParam(':accesstoken', $authorizationHeader, PDO::PARAM_STR);
+                $query->execute();
+                $rowCount = $query->rowCount();
+                if ($rowCount === 0) {
+                    $response = new Response();
+                    $response->setSuccess(false);
+                    $response->setHttpStatusCode(404);
+                    $response->addMessage("Session not found");
+                    $response->send();
+                    exit;
+                }
+
+                $response = new Response();
+                $response->setSuccess(true);
+                $response->setHttpStatusCode(200);
+                $response->addMessage("Session deleted successfully");
+                $response->send();
+                exit;
+            } catch (PDOException $e) {
+                $response = new Response();
+                $response->setSuccess(false);
+                $response->setHttpStatusCode(500);
+                $response->addMessage("There was an issue deleting the session, please try again");
+                $response->send();
+                exit;
+            }
+        } elseif ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
+        } else {
+            $response = new Response();
+            $response->setSuccess(false);
+            $response->setHttpStatusCode(405);
+            $response->addMessage("Request methode not supported");
+            $response->send();
+            exit;
+        }
     } elseif (empty($_GET)) {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $response = new Response();
