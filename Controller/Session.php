@@ -95,7 +95,8 @@ try {
             }
             try {
                 $refreshToken = $jsonData->refreshToken;
-                $query = $writeDB->prepare('SELECT tbl_sessions.id as sessionId, tbl_sessions.userID as userId, tbl_sessions.accessToken as accessToken, tbl_sessions.refreshToken as refreshToken, tbl_sessions.accessTokenExpiry as accessTokenExpiry, tbl_sessions.refreshTokenExpiry as refreshTokenExpiry, tbl_users.username as username, tbl_users.userActive,tbl_users.loginAttempts FROM tbl_sessions, tbl_users WHERE tbl_sessions.id = :sessionid and tbl_sessions.userId = tbl_users.id and tbl_sessions.accessToken = :accesstoken');
+                $query = $writeDB->prepare('SELECT tbl_sessions.id as sessionId, tbl_sessions.userID as userId, tbl_sessions.accessToken as accessToken, tbl_sessions.refreshToken as refreshToken, tbl_sessions.accessTokenExpiry as accessTokenExpiry, tbl_sessions.refreshTokenExpiry as refreshTokenExpiry, tbl_users.username as username, tbl_users.userActive,tbl_users.loginAttempts
+                FROM tbl_sessions, tbl_users WHERE tbl_sessions.id = :sessionid and tbl_sessions.userId = tbl_users.id and tbl_sessions.accessToken = :accesstoken and tbl_sessions.refreshToken = :refreshtoken');
                 $query->bindParam(':sessionid', $sessionId, PDO::PARAM_INT);
                 $query->bindParam(':accesstoken', $authorizationHeader, PDO::PARAM_STR);
                 $query->bindParam(':refreshtoken', $refreshToken, PDO::PARAM_STR);
@@ -189,10 +190,11 @@ try {
                 $response->send();
                 exit;
             } catch (PDOException $ex) {
+                error_log("Database query error - " . $ex, 0);
                 $response = new Response();
                 $response->setSuccess(false);
                 $response->setHttpStatusCode(500);
-                $response->addMessage("There was an issue updating the session, please try again");
+                $response->addMessage("There was an issue updating the session, please try again " . $ex->getMessage());
                 $response->send();
                 exit;
             }

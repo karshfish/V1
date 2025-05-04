@@ -14,6 +14,75 @@ try {
     $response->send();
     exit;
 }
+//Creating the authentication process
+//first checking the authentication header
+if (!isset($_SERVER['HTTP_AUTHORIZATION']) || strlen($_SERVER['HTTP_AUTHORIZATION']) < 1) {
+    $response = new Response;
+    $response->setHttpStatusCode(401);
+    $response->setSuccess(false);
+    (!isset($_SERVER['HTTP_AUTHORIZATION']) ? $response->addMessage('Access token missing from the header') : Null);
+    (strlen($_SERVER['HTTP_AUTHORIZATION']) < 1 ? $response->addMessage('Access token cannot be empty') : Null);
+    $response->send();
+    exit;
+}
+//perform a query to identify the session user and the user ID
+try {
+    $accessToken = $_SERVER['HTTP_AUTHORIZATION'];
+    $query = $writeDB->prepare('SELECT accessTokenExpiry, userId, userActive, loginAttempts
+     FROM tbl_users, tbl_sessions
+     WHERE tbl_sessions.userId = tbl_users.Id AND accessToken=:accessToken');
+    $query->bindParam(':accessToken', $accessToken, PDO::PARAM_STR);
+    $query->execute();
+    $rowCount = $query->rowCount();
+    if ($rowCount === 0) {
+        $response = new Response;
+        $response->setHttpStatusCode(401);
+        $response->setSuccess(false);
+        $response->addMessage('Invalid access token');
+        $response->send();
+        exit;
+    }
+
+    $row = $query->fetch(PDO::FETCH_ASSOC);
+    $returned_userId = $row['userId'];
+    $returned_accessTokenExpiry = $row['accessTokenExpiry'];
+    $returned_userActive = $row['userActive'];
+    $returned_loginAttempts = $row['loginAttempts'];
+    if ($returned_loginAttempts > 3) {
+        $response = new Response;
+        $response->setHttpStatusCode(401);
+        $response->setSuccess(false);
+        $response->addMessage('User is currently locked out');
+        $response->send();
+        exit;
+    }
+    if ($returned_userActive !== 'Y') {
+        $response = new Response;
+        $response->setHttpStatusCode(401);
+        $response->setSuccess(false);
+        $response->addMessage('User account is not active');
+        $response->send();
+        exit;
+    }
+    if (strtotime($returned_accessTokenExpiry) < time()) {
+        $response = new Response;
+        $response->setHttpStatusCode(401);
+        $response->setSuccess(false);
+        $response->addMessage('Access token is expired. Login again');
+        $response->send();
+        exit;
+    }
+} catch (PDOException $ex) {
+    $response = new Response;
+    $response->setHttpStatusCode(500);
+    $response->setSuccess(false);
+    $response->addMessage('Query error: ' . $ex->getMessage());
+    $response->send();
+    exit;
+}
+
+
+//end if authentication process
 if (array_key_exists('taskid', $_GET)) {
     $taskid = $_GET['taskid'];
     if ($taskid == '' || !is_numeric($taskid)) {
